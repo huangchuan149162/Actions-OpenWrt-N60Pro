@@ -89,14 +89,6 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Clean up unnecessary files to save space
-      run: |
-        sudo docker system prune -a --volumes --force
-        sudo rm -rf /workdir/openwrt/tmp/* /workdir/openwrt/dl/*
-        sudo rm -rf /workdir/openwrt/staging_dir/*
-        sudo rm -rf /workdir/openwrt/build_dir/*
-        df -hT
-
     - name: Compile the firmware
       id: compile
       run: |
@@ -169,7 +161,6 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    # 保持清理过期工作流和旧发布的步骤
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@main
       with:
