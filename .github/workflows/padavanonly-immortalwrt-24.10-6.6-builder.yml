@@ -18,7 +18,7 @@ on:
 
 env:
   REPO_URL: https://github.com/huangchuan149162/immortalwrt-mt798x-6.6
-  REPO_BRANCH: openwrt-24.10-6.6
+  REPO_BRANCH: temp-modify-dts-unlock-fip-bl2
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: padavanonly-immortalwrt-mt798x-24.10-6.6.config
   DIY_P1_SH: diy-part1.sh
@@ -26,7 +26,7 @@ env:
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
-  FIRMWARE_TAG: padavanonly-237-24.10-6.6
+  FIRMWARE_TAG: padavanonly-237-24.10-6.6-temp-modify-dts-unlock-fip-bl2
   TZ: Asia/Shanghai
 
 jobs:
@@ -86,7 +86,14 @@ jobs:
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
+        # 先移动原始 config 文件
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        
+        # 然后追加你的特殊配置，这样才能确保生效
+        echo "CONFIG_TARGET_ROOTFS_INITRAMFS=y" >> openwrt/.config
+        # 顺便强制关闭签名校验，防止 initramfs 启动后无法安装软件包
+        echo "CONFIG_SIGNATURE_CHECK=n" >> openwrt/.config
+        
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
@@ -104,8 +111,11 @@ jobs:
       id: compile
       run: |
         cd openwrt
+        make defconfig
+        # 仅编译内核相关目标，这会跳过大部分无用的应用包，速度提升 5-10 倍
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        make target/linux/compile -j$(nproc) || make target/linux/compile -j1 V=s
+        
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -127,7 +137,9 @@ jobs:
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
         cd openwrt/bin/targets/*/*
-        rm -rf packages
+        # 只保留 initramfs-kernel.bin，删除其他大文件节省上传时间
+        ls -lh
+        find . -type f ! -name "*initramfs-kernel.bin" -delete
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
