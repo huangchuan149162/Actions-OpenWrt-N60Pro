@@ -19,5 +19,7 @@ echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.defau
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 
 # Add ADGuardHome source
-git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
-chmod -R 755 ./package/luci-app-adguardhome/*
+#git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
+#chmod -R 755 ./package/luci-app-adguardhome/*
+
+sed -i '/read-only;/d' target/linux/mediatek/dts/mt7986a-netcore-n60-pro.dts
