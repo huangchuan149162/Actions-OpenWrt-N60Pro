@@ -19,21 +19,15 @@
 # Modify hostname
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
 
-# 添加组播防火墙规则
-cat >> package/network/config/firewall/files/firewall.config <<EOF
-config rule
-        option name 'Allow-UDP-igmpproxy'
-        option src 'wan'
-        option dest 'lan'
-        option dest_ip '224.0.0.0/4'
-        option proto 'udp'
-        option target 'ACCEPT'        
-        option family 'ipv4'
+# 1. 强制在内核配置中启用 MTD 写支持
+echo "CONFIG_MTD_WRITEABLE_TABLE=y" >> .config
 
-config rule
-        option name 'Allow-UDP-udpxy'
-        option src 'wan'
-        option dest_ip '224.0.0.0/4'
-        option proto 'udp'
-        option target 'ACCEPT'
-EOF
+# 2. 确保 kmod-mtd-rw 选上了
+echo "CONFIG_PACKAGE_kmod-mtd-rw=y" >> .config
+
+# 3. 强制开启 initramfs 生成（如果你需要这个文件）
+echo "CONFIG_TARGET_ROOTFS_INITRAMFS=y" >> .config
+
+# 4. 删除 DTS 里的 read-only 限制
+# 请根据你的实际路径微调，通常是 target/linux/mediatek/dts/...
+sed -i '/read-only;/d' target/linux/mediatek/dts/mt7986a-netcore-n60-pro.dts
