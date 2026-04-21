@@ -90,7 +90,19 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-
+        # 【关键：强制生成默认配置并补全依赖】
+        # 这一步能防止因缺少依赖导致的工具链全量重编
+        make defconfig
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.bash_history
+          openwrt/dl
+          openwrt/staging_dir
+        key: ${{ runner.os }}-openwrt-${{ hashFiles('openwrt/.config') }}
+        restore-keys: |
+          ${{ runner.os }}-openwrt-
     - name: Download package
       id: package
       run: |
