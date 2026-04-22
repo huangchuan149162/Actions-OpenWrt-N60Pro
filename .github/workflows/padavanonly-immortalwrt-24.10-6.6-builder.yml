@@ -90,12 +90,24 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        make defconfig  # 【重要优化】强制在此处补全依赖，让接下来的 Cache 获取最准确的 Hash
+
+    - name: Cache toolchain and downloads
+      uses: actions/cache@v3
+      with:
+        path: |
+          openwrt/dl
+          openwrt/staging_dir
+        # 依赖上面生成的完整 .config 作为唯一指纹
+        key: ${{ runner.os }}-openwrt-${{ hashFiles('openwrt/.config') }}
+        restore-keys: |
+          ${{ runner.os }}-openwrt-
 
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig
+        # 这里就不需要再重复 make defconfig 了
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
