@@ -18,7 +18,8 @@
 
 # Modify hostname
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
-
+# 不生成initramfs固件
+echo "CONFIG_TARGET_ROOTFS_INITRAMFS=n" >> .config
 # 添加组播防火墙规则
 cat >> package/network/config/firewall/files/firewall.config <<EOF
 config rule
