@@ -117,7 +117,17 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
+        
+        # 【核心修复】将宏定义直接注入环境变量，确保全局生效
+        export CFLAGS="-D_LARGEFILE64_SOURCE"
+        export CPPFLAGS="-D_LARGEFILE64_SOURCE"
+        
+        # 如果还是不行，这行 sed 是终极杀手锏，直接从物理文件上替换掉报错类型
+        find build_dir/ -name "readelf.c" -exec sed -i 's/off64_t/off_t/g' {} + 2>/dev/null || true
+        find build_dir/ -name "readelf.c" -exec sed -i 's/fseeko64/fseeko/g' {} + 2>/dev/null || true
+        
         make -j$(nproc) || make -j1 || make -j1 V=s
+        
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
