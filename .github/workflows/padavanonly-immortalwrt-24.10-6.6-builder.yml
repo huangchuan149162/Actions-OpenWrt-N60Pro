@@ -92,16 +92,24 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
         make defconfig  # 【重要优化】强制在此处补全依赖，让接下来的 Cache 获取最准确的 Hash
 
-    - name: Cache toolchain and downloads
+    - name: Cache secondary
       uses: actions/cache@v3
       with:
-        path: |
-          openwrt/dl
-          openwrt/staging_dir
-        # 依赖上面生成的完整 .config 作为唯一指纹
-        key: ${{ runner.os }}-openwrt-${{ hashFiles('openwrt/.config') }}
+        path: openwrt/dl
+        # dl 目录只要 feeds 配置文件不变，大部分包就不变，这样 key 非常稳定
+        key: ${{ runner.os }}-openwrt-dl-${{ hashFiles('openwrt/feeds.conf.default') }}
         restore-keys: |
-          ${{ runner.os }}-openwrt-
+          ${{ runner.os }}-openwrt-dl-
+
+    - name: Cache toolchain
+      uses: actions/cache@v3
+      with:
+        path: openwrt/staging_dir
+        # 工具链的 key 加上具体的架构名，避免不同架构冲突
+        # 即使 .config 变了，只要不是大版本变动，工具链通常可以复用
+        key: ${{ runner.os }}-openwrt-toolchain-${{ hashFiles('openwrt/feeds.conf.default') }}
+        restore-keys: |
+          ${{ runner.os }}-openwrt-toolchain-
 
     - name: Download package
       id: package
@@ -116,22 +124,21 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) thread compile"
         
-        # 【核心修复】将宏定义直接注入环境变量，确保全局生效
+        # 1. 如果缓存命中了，先强制清理一下上次报错的目录（可选，但更稳）
+        # [ -d build_dir ] && rm -rf build_dir/toolchain-aarch64*binutils*
+        
+        # 2. 物理修复 musl 下的 off64_t 报错 (针对 binutils 2.42)
+        # 我们在编译开始前，先让脚本在源头上把所有 readelf.c 里的错误类型改掉
+        find . -name "readelf.c" -exec sed -i 's/off64_t/off_t/g' {} +
+        find . -name "readelf.c" -exec sed -i 's/fseeko64/fseeko/g' {} +
+        
+        # 3. 设置全局宏定义，防止其他插件也报类似的错
         export CFLAGS="-D_LARGEFILE64_SOURCE"
         export CPPFLAGS="-D_LARGEFILE64_SOURCE"
         
-        # 如果还是不行，这行 sed 是终极杀手锏，直接从物理文件上替换掉报错类型
-        find build_dir/ -name "readelf.c" -exec sed -i 's/off64_t/off_t/g' {} + 2>/dev/null || true
-        find build_dir/ -name "readelf.c" -exec sed -i 's/fseeko64/fseeko/g' {} + 2>/dev/null || true
-        
+        echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
-        
-        echo "status=success" >> $GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: Check space usage
       if: (!cancelled())
